@@ -20,6 +20,11 @@ jobs:
           Start-Process -FilePath "$env:TEMP\winsdksetup.exe" -ArgumentList "/Quiet", "/NoRestart", "/Features", "+", "/InstallPath", "C:\WindowsSDK" -Wait
           Write-Host Adding environment variables...
           $env:PATH = 'C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64' + $env:PATH
+
+          if (-Not (Test-Path "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\mt.exe")) {
+            throw "mt.exe not found at expected path"
+          }
+          
           [Environment]::SetEnvironmentVariable('PATH', $env:PATH, [EnvironmentVariableTarget]::Machine)
 
       - name: Setup TDM-GCC
