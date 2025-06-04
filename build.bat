@@ -36,10 +36,10 @@ if exist "Win32XmlUI_x86.dll.a" (
 ECHO Build 64-bit static library
 
 g++ -c -std=c++17 -I. -m64 Win32XmlUI.cpp tinyxml2.cpp
-ar rcs lib\Win32XmlUI_x64.a Win32XmlUI.o tinyxml2.o
 if exist "Win32XmlUI_x64.a" (
   move "Win32XmlUI_x64.a" "lib\Win32XmlUI_x64.a"
 )
+ar rcs lib\Win32XmlUI_x64.a Win32XmlUI.o tinyxml2.o
 
 del Win32XmlUI.o tinyxml2.o
 
