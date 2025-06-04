@@ -8,7 +8,7 @@ mkdir lib
 
 ECHO Build 32-bit static library
 
-g++ -c -std=c++17 -I. -m32 Win32XmlUI.cpp tinyxml2.cpp
+g++ -c -std=c++17 -I. -DWIN32XMLUI_STATIC -m32 Win32XmlUI.cpp tinyxml2.cpp
 if exist "Win32XmlUI_x86.a" (
   move "Win32XmlUI_x86.a" "lib\Win32XmlUI_x86.a"
 )
@@ -26,7 +26,7 @@ if exist "Win32XmlUI_x86.dll.a" (
 
 ECHO Build 64-bit static library
 
-g++ -c -std=c++17 -I. -m64 Win32XmlUI.cpp tinyxml2.cpp
+g++ -c -std=c++17 -I. -DWIN32XMLUI_STATIC -m64 Win32XmlUI.cpp tinyxml2.cpp
 if exist "Win32XmlUI_x64.a" (
   move "Win32XmlUI_x64.a" "lib\Win32XmlUI_x64.a"
 )
