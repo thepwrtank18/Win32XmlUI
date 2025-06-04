@@ -22,6 +22,7 @@ g++ -c -std=c++17 -I. -m32 Win32XmlUI.cpp tinyxml2.cpp
 if exist "Win32XmlUI_x86.a" (
   move "Win32XmlUI_x86.a" "lib\Win32XmlUI_x86.a"
 )
+tree /f
 ar rcs lib\Win32XmlUI_x86.a Win32XmlUI.o tinyxml2.o
 
 del Win32XmlUI.o tinyxml2.o
@@ -32,13 +33,14 @@ g++ -std=c++17 -I. -shared -m32 -o lib\Win32XmlUI_x86.dll Win32XmlUI.cpp tinyxml
 if exist "Win32XmlUI_x86.dll.a" (
   move "Win32XmlUI_x86.dll.a" "lib\Win32XmlUI_x86.dll.a"
 )
-
+tree /f
 ECHO Build 64-bit static library
 
 g++ -c -std=c++17 -I. -m64 Win32XmlUI.cpp tinyxml2.cpp
 if exist "Win32XmlUI_x64.a" (
   move "Win32XmlUI_x64.a" "lib\Win32XmlUI_x64.a"
 )
+tree /f
 ar rcs lib\Win32XmlUI_x64.a Win32XmlUI.o tinyxml2.o
 
 del Win32XmlUI.o tinyxml2.o
@@ -49,5 +51,5 @@ g++ -std=c++17 -I. -shared -m64 -o lib\Win32XmlUI_x64.dll Win32XmlUI.cpp tinyxml
 if exist "Win32XmlUI_x64.dll.a" (
   move "Win32XmlUI_x64.dll.a" "lib\Win32XmlUI_x64.dll.a"
 )
-
+tree /f
 echo Library build complete. Use sample/build_sample.bat to build the example client. 
