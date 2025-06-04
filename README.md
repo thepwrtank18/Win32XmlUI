@@ -1,5 +1,5 @@
 # Win32XmlUI
-A UI framework for C++ and Windows for Windows XP+
+A UI framework for C++ and Windows XP+
 
 ## Usage
 This project supports both static and dynamic linking; see the sample folder
