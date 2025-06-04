@@ -1,5 +1,6 @@
 <?xml version="1.1" encoding="UTF-8"?>
-<Window dimension="320,240" title="Example 2" borderstyle="sizabletoolwindow" closeaction="closewindow">
+<Window dimension="400,360" title="Example 2" borderstyle="sizabletoolwindow" closeaction="closewindow">
     <Background color="240,240,240" />
-    <Text location="10,10" text="Hello, Earth!" font="Consolas" fontsize="9" />
+    <RichText location="10,10" font="Consolas" fonttype="monospace" fontsize="9"><i>Hello</i>, <b>earth!</b> I'm a <del>test</del> for<br/><ins>font</ins> styling.</RichText>
+    <RichText location="10,50" font="Segoe UI" fontsize="9"><i>Hello</i>, <b>earth!</b> I'm a <del>test</del> for <ins>font</ins> styling.</RichText>
 </Window>
