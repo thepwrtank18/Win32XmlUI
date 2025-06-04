@@ -16,26 +16,26 @@ set PATH=C:\TDM-GCC-64\bin;%PATH%
 ::REM Move the dll.a file to the lib directory
 ::move Win32XmlUI_x64.dll.a lib\Win32XmlUI_x64.dll.a
 
-REM Build 32-bit static library
+ECHO Build 32-bit static library
 
 g++ -c -std=c++17 -I. -m32 Win32XmlUI.cpp tinyxml2.cpp
 ar rcs lib\Win32XmlUI_x86.a Win32XmlUI.o tinyxml2.o
 
 del Win32XmlUI.o tinyxml2.o
 
-REM Build 32-bit DLL
+ECHO Build 32-bit DLL
 
 g++ -std=c++17 -I. -shared -m32 -o lib\Win32XmlUI_x86.dll Win32XmlUI.cpp tinyxml2.cpp -Wl,--out-implib,lib\Win32XmlUI_x86.dll.a -lgdi32 -lcomctl32 -DWIN32XMLUI_EXPORTS
 ::move Win32XmlUI_x86.dll.a lib\Win32XmlUI_x86.dll.a
 
-REM Build 64-bit static library
+ECHO Build 64-bit static library
 
 g++ -c -std=c++17 -I. -m64 Win32XmlUI.cpp tinyxml2.cpp
 ar rcs lib\Win32XmlUI_x64.a Win32XmlUI.o tinyxml2.o
 
 del Win32XmlUI.o tinyxml2.o
 
-REM Build 64-bit DLL
+ECHO Build 64-bit DLL
 
 g++ -std=c++17 -I. -shared -m64 -o lib\Win32XmlUI_x64.dll Win32XmlUI.cpp tinyxml2.cpp -Wl,--out-implib,lib\Win32XmlUI_x64.dll.a -lgdi32 -lcomctl32 -DWIN32XMLUI_EXPORTS
 ::move Win32XmlUI_x64.dll.a lib\Win32XmlUI_x64.dll.a
