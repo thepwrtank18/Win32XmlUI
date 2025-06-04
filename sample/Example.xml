@@ -1,6 +1,6 @@
 <?xml version="1.1" encoding="UTF-8"?>
 <Window dimension="640,480" title="Example" borderstyle="fixedsingle" closeaction="endprogram">
-    <RichText location="10,10" font="Segoe UI" fontsize="9">Hello, world!</RichText>
-    <Button location="10,30" size="100,30" text="Click me" onclick="ArbitraryFunction" font="Segoe UI" fontsize="9" />
-    <Button location="10,60" size="100,30" text="Open Example 2" onclick="OpenExample2" font="Segoe UI" fontsize="9" />
+    <RichText id="text1" location="10,10" font="Segoe UI" fontsize="9">Hello, world!</RichText>
+    <Button id="button1" location="10,30" size="100,30" text="Click me" onclick="ArbitraryFunction" font="Segoe UI" fontsize="9" />
+    <Button id="button2" location="10,60" size="100,30" text="Open Example 2" onclick="OpenExample2" font="Segoe UI" fontsize="9" />
 </Window>

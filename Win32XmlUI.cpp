@@ -15,7 +15,7 @@
 #include <tom.h>
 #include <regex>
 
-static std::map<std::string, std::function<void()>> g_functionRegistry;
+static std::map<std::string, std::function<void(HWND)>> g_functionRegistry;
 
 static std::map<HWND, std::string> g_buttonOnClickMap;
 
@@ -31,6 +31,7 @@ struct WindowExtraData {
     COLORREF bgColor;
     int closeAction;
     std::vector<HFONT> createdFonts;
+    std::unordered_map<std::string, HWND> idToHwnd;
 };
 
 static HMODULE g_hRichEdit = nullptr;
@@ -137,7 +138,7 @@ namespace Win32XmlUI {
                 std::string funcName = g_buttonOnClickMap[ctrlHwnd];
                 auto it = g_functionRegistry.find(funcName);
                 if (it != g_functionRegistry.end()) {
-                    it->second();
+                    it->second(hwnd);
                 }
             }
             break;
@@ -404,6 +405,51 @@ BOOL CALLBACK EnumResNameProc(HMODULE hModule, LPCSTR lpszType, LPSTR lpszName, 
         return px;
     }
 
+    // For tracking element geometry by ID during window creation
+    struct ElementGeometry {
+        int x = 0, y = 0, w = 0, h = 0;
+    };
+
+    // Minimal evaluator for expressions like 'heightof(text1)+10' or 'widthof(text1)+10'
+    static int EvalSimpleExpr(const char* expr, const std::map<std::string, ElementGeometry>& geomMap, const char* axis) {
+        // Only supports: heightof(id), widthof(id), +, integer literals, and whitespace
+        int result = 0;
+        const char* p = expr;
+        while (*p) {
+            while (*p == ' ' || *p == '\t') ++p;
+            if (strncmp(p, "heightof(", 9) == 0) {
+                p += 9;
+                const char* idStart = p;
+                while (*p && *p != ')') ++p;
+                std::string id(idStart, p - idStart);
+                if (*p == ')') ++p;
+                auto it = geomMap.find(id);
+                if (it != geomMap.end()) {
+                    result += it->second.h;
+                }
+            } else if (strncmp(p, "widthof(", 8) == 0) {
+                p += 8;
+                const char* idStart = p;
+                while (*p && *p != ')') ++p;
+                std::string id(idStart, p - idStart);
+                if (*p == ')') ++p;
+                auto it = geomMap.find(id);
+                if (it != geomMap.end()) {
+                    result += it->second.w;
+                }
+            } else if (*p == '+') {
+                ++p;
+            } else if (isdigit(*p) || (*p == '-' && isdigit(*(p+1)))) {
+                int val = strtol(p, (char**)&p, 10);
+                result += val;
+            } else {
+                // Unknown token, skip
+                ++p;
+            }
+        }
+        return result;
+    }
+
     HWND CreateUIFromXML(const char* xmlPath, HINSTANCE hInstance, int nCmdShow, int resourceId) {
         tinyxml2::XMLDocument doc;
         std::string xmlContent;
@@ -534,23 +580,29 @@ BOOL CALLBACK EnumResNameProc(HMODULE hModule, LPCSTR lpszType, LPSTR lpszName, 
         if (GetCommandLineA() && strstr(GetCommandLineA(), "--Win32XmlUI-Debug")) {
             MessageBoxA(nullptr, "Entering control creation loop", "Debug", MB_OK);
         }
+        std::map<std::string, ElementGeometry> geomMap;
         for (tinyxml2::XMLElement* child = root->FirstChildElement(); child; child = child->NextSiblingElement()) {
             std::string tag = child->Name();
+            const char* id = child->Attribute("id");
             if (tag == "Text") {
                 const char* loc = child->Attribute("location");
                 const char* text = child->Attribute("text");
                 const char* fontName = child->Attribute("font");
                 int fontSize = child->IntAttribute("fontsize", 9);
                 const char* fontType = child->Attribute("fonttype");
-                if (GetCommandLineA() && strstr(GetCommandLineA(), "--Win32XmlUI-Debug")) {
-                    char msg[256];
-                    snprintf(msg, sizeof(msg), "XML fonttype attribute: %s", fontType ? fontType : "(null)");
-                    MessageBoxA(NULL, msg, "XML Attribute Debug (Text)", MB_OK);
-                }
                 const char* fgStr = child->Attribute("foreground");
                 const char* bgStr = child->Attribute("background");
                 int x = 0, y = 0;
-                if (loc) sscanf(loc, "%d,%d", &x, &y);
+                if (loc && strchr(loc, ',')) {
+                    std::string locStr(loc);
+                    size_t comma = locStr.find(',');
+                    std::string xExpr = locStr.substr(0, comma);
+                    std::string yExpr = locStr.substr(comma+1);
+                    x = EvalSimpleExpr(xExpr.c_str(), geomMap, "x");
+                    y = EvalSimpleExpr(yExpr.c_str(), geomMap, "y");
+                } else if (loc) {
+                    sscanf(loc, "%d,%d", &x, &y);
+                }
                 HWND hText = CreateWindowExA(0, "STATIC", text ? text : "",
                     WS_CHILD | WS_VISIBLE,
                     x, y, 300, 20, hwnd, nullptr, hInstance, nullptr);
@@ -584,6 +636,16 @@ BOOL CALLBACK EnumResNameProc(HMODULE hModule, LPCSTR lpszType, LPSTR lpszName, 
                         }
                     }
                     g_controlColorMap[hText] = info;
+                    if (id) pData->idToHwnd[id] = hText;
+                    // Store geometry
+                    RECT rc; GetWindowRect(hText, &rc);
+                    POINT pt = {rc.left, rc.top};
+                    ScreenToClient(hwnd, &pt);
+                    int w = 300, h = 20;
+                    RECT cr; GetClientRect(hText, &cr);
+                    w = cr.right - cr.left;
+                    h = cr.bottom - cr.top;
+                    if (id) geomMap[id] = {x, y, w, h};
                 }
             } else if (tag == "RichText") {
                 if (!g_hRichEdit) g_hRichEdit = LoadLibraryA("Msftedit.dll");
@@ -592,13 +654,21 @@ BOOL CALLBACK EnumResNameProc(HMODULE hModule, LPCSTR lpszType, LPSTR lpszName, 
                 const char* fontName = child->Attribute("font");
                 int fontSize = child->IntAttribute("fontsize", 9);
                 const char* fontType = child->Attribute("fonttype");
-                if (GetCommandLineA() && strstr(GetCommandLineA(), "--Win32XmlUI-Debug")) {
-                    char msg[256];
-                    snprintf(msg, sizeof(msg), "XML fonttype attribute: %s", fontType ? fontType : "(null)");
-                    MessageBoxA(NULL, msg, "XML Attribute Debug (RichText)", MB_OK);
+                const char* fgStr = child->Attribute("foreground");
+                const char* bgStr = child->Attribute("background");
+                int x = 10, y = 10;
+                if (loc && strchr(loc, ',')) {
+                    std::string locStr(loc);
+                    size_t comma = locStr.find(',');
+                    std::string xExpr = locStr.substr(0, comma);
+                    std::string yExpr = locStr.substr(comma+1);
+                    x = EvalSimpleExpr(xExpr.c_str(), geomMap, "x");
+                    y = EvalSimpleExpr(yExpr.c_str(), geomMap, "y");
+                } else if (loc) {
+                    sscanf(loc, "%d,%d", &x, &y);
                 }
-                int x = 10, y = 10, w = 300, h = 40;
-                if (loc && sscanf(loc, "%d,%d", &x, &y) != 2) { x = 10; y = 10; }
+                int x0 = x, y0 = y, w = 300, h = 40;
+                if (size) sscanf(size, "%d,%d", &w, &h);
                 // Determine the actual font to use (same logic as CreateUIFont)
                 const char* actualFont = nullptr;
                 if (fontType && strcmp(fontType, "monospace") == 0) {
@@ -620,7 +690,7 @@ BOOL CALLBACK EnumResNameProc(HMODULE hModule, LPCSTR lpszType, LPSTR lpszName, 
                 }
                 HFONT hFont = CreateUIFont(fontName, fontSize, fontType);
                 // Compose RTF header with font table and font size, using the actual font
-                int fsTwips = fontSize * 2; // RTF font size is in half-points
+                int fsTwips = fontSize * 2;
                 std::string rtf = "{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 " + std::string(actualFont) + ";}}\\fs" + std::to_string(fsTwips) + " ";
                 rtf += XmlToRtf(child);
                 rtf += "}";
@@ -660,9 +730,27 @@ BOOL CALLBACK EnumResNameProc(HMODULE hModule, LPCSTR lpszType, LPSTR lpszName, 
                     info.bg = pData->bgColor;
                     info.hBrush = CreateSolidBrush(info.bg);
                     info.fg = RGB(0,0,0); // default to black
+                    if (fgStr) {
+                        int r, g, b;
+                        if (sscanf(fgStr, "%d,%d,%d", &r, &g, &b) == 3)
+                            info.fg = RGB(r, g, b);
+                    }
+                    if (bgStr) {
+                        int r, g, b;
+                        if (sscanf(bgStr, "%d,%d,%d", &r, &g, &b) == 3) {
+                            info.bg = RGB(r, g, b);
+                            info.hBrush = CreateSolidBrush(info.bg);
+                        }
+                    }
                     g_controlColorMap[hRich] = info;
                     // Ensure RichEdit is visible and on top
                     SetWindowPos(hRich, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE);
+                    if (id) pData->idToHwnd[id] = hRich;
+                    // Store geometry
+                    RECT cr; GetClientRect(hRich, &cr);
+                    int rw = cr.right - cr.left;
+                    int rh = cr.bottom - cr.top;
+                    if (id) geomMap[id] = {x, y, rw, rh};
                 }
             } else if (tag == "Button") {
                 const char* loc = child->Attribute("location");
@@ -672,15 +760,20 @@ BOOL CALLBACK EnumResNameProc(HMODULE hModule, LPCSTR lpszType, LPSTR lpszName, 
                 const char* fontName = child->Attribute("font");
                 int fontSize = child->IntAttribute("fontsize", 9);
                 const char* fontType = child->Attribute("fonttype");
-                if (GetCommandLineA() && strstr(GetCommandLineA(), "--Win32XmlUI-Debug")) {
-                    char msg[256];
-                    snprintf(msg, sizeof(msg), "XML fonttype attribute: %s", fontType ? fontType : "(null)");
-                    MessageBoxA(NULL, msg, "XML Attribute Debug (Button)", MB_OK);
-                }
                 const char* fgStr = child->Attribute("foreground");
                 const char* bgStr = child->Attribute("background");
-                int x = 0, y = 0, w = 80, h = 25;
-                if (loc) sscanf(loc, "%d,%d", &x, &y);
+                int x = 0, y = 0;
+                if (loc && strchr(loc, ',')) {
+                    std::string locStr(loc);
+                    size_t comma = locStr.find(',');
+                    std::string xExpr = locStr.substr(0, comma);
+                    std::string yExpr = locStr.substr(comma+1);
+                    x = EvalSimpleExpr(xExpr.c_str(), geomMap, "x");
+                    y = EvalSimpleExpr(yExpr.c_str(), geomMap, "y");
+                } else if (loc) {
+                    sscanf(loc, "%d,%d", &x, &y);
+                }
+                int w = 80, h = 25;
                 if (size) sscanf(size, "%d,%d", &w, &h);
                 HWND btnHwnd = CreateWindowExA(0, "BUTTON", text ? text : "Button",
                     WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
@@ -715,6 +808,9 @@ BOOL CALLBACK EnumResNameProc(HMODULE hModule, LPCSTR lpszType, LPSTR lpszName, 
                         }
                     }
                     g_controlColorMap[btnHwnd] = info;
+                    if (id) pData->idToHwnd[id] = btnHwnd;
+                    // Store geometry
+                    if (id) geomMap[id] = {x, y, w, h};
                 }
                 if (onclick && btnHwnd) {
                     std::string funcName = onclick;
@@ -731,7 +827,7 @@ BOOL CALLBACK EnumResNameProc(HMODULE hModule, LPCSTR lpszType, LPSTR lpszName, 
         return hwnd;
     }
 
-    void RegisterCallback(const char* name, std::function<void()> func) {
+    void RegisterCallback(const char* name, std::function<void(HWND)> func) {
         g_functionRegistry[name] = func;
     }
 } 
@@ -741,6 +837,93 @@ HWND CreateUIFromXML(const char* xmlPath, HINSTANCE hInstance, int nCmdShow, int
     return Win32XmlUI::CreateUIFromXML(xmlPath, hInstance, nCmdShow, resourceId);
 }
 
-void RegisterCallback(const char* name, std::function<void()> func) {
+void RegisterCallback(const char* name, std::function<void(HWND)> func) {
     Win32XmlUI::RegisterCallback(name, func);
-} 
+}
+
+// Helper to parse borderstyle string and return style/exStyle
+static void ParseBorderStyle(const char* border, DWORD& style, DWORD& exStyle) {
+    style = WS_OVERLAPPEDWINDOW;
+    exStyle = 0;
+    if (!border) return;
+    std::string borderStyle(border);
+    if (borderStyle == "none") {
+        style = WS_POPUP;
+    } else if (borderStyle == "fixedsingle") {
+        style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+    } else if (borderStyle == "fixed3d") {
+        style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+        exStyle |= WS_EX_CLIENTEDGE;
+    } else if (borderStyle == "fixeddialog") {
+        style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU;
+    } else if (borderStyle == "sizable") {
+        style = WS_OVERLAPPEDWINDOW;
+    } else if (borderStyle == "fixedtoolwindow") {
+        style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+        exStyle |= WS_EX_TOOLWINDOW;
+    } else if (borderStyle == "sizabletoolwindow") {
+        style = WS_OVERLAPPEDWINDOW;
+        exStyle |= WS_EX_TOOLWINDOW;
+    }
+}
+
+bool SetElementProperty(HWND hwnd, const char* elementId, const char* propertyName, const char* value) {
+    if (!hwnd || !propertyName || !value) return false;
+    WindowExtraData* pData = (WindowExtraData*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
+    if (!pData) return false;
+    if (!elementId) {
+        // Set property on the window itself
+        if (strcmp(propertyName, "dimension") == 0) {
+            int w = 0, h = 0;
+            if (sscanf(value, "%d,%d", &w, &h) == 2 && w > 0 && h > 0) {
+                RECT rc = {0, 0, w, h};
+                DWORD style = (DWORD)GetWindowLongPtr(hwnd, GWL_STYLE);
+                DWORD exStyle = (DWORD)GetWindowLongPtr(hwnd, GWL_EXSTYLE);
+                AdjustWindowRectEx(&rc, style, FALSE, exStyle);
+                SetWindowPos(hwnd, nullptr, 0, 0, rc.right - rc.left, rc.bottom - rc.top, SWP_NOMOVE | SWP_NOZORDER);
+                return true;
+            }
+        }
+        if (strcmp(propertyName, "title") == 0) {
+            SetWindowTextA(hwnd, value);
+            return true;
+        }
+        if (strcmp(propertyName, "closeaction") == 0) {
+            pData->closeAction = strcmp(value, "endprogram") == 0 ? 1 : 0;
+            return true;
+        }
+        if (strcmp(propertyName, "borderstyle") == 0) {
+            DWORD style, exStyle;
+            ParseBorderStyle(value, style, exStyle);
+            // Get current window and client rects
+            RECT winRect, clientRect;
+            GetWindowRect(hwnd, &winRect);
+            GetClientRect(hwnd, &clientRect);
+            int clientW = clientRect.right - clientRect.left;
+            int clientH = clientRect.bottom - clientRect.top;
+            // Change style
+            SetWindowLongPtr(hwnd, GWL_STYLE, style);
+            SetWindowLongPtr(hwnd, GWL_EXSTYLE, exStyle);
+            // Calculate new window size for the same client area
+            RECT newRect = {0, 0, clientW, clientH};
+            AdjustWindowRectEx(&newRect, style, FALSE, exStyle);
+            // Set new window size and update frame, show and enable window
+            SetWindowPos(hwnd, HWND_TOP, winRect.left, winRect.top,
+                newRect.right - newRect.left, newRect.bottom - newRect.top,
+                SWP_NOZORDER | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+            EnableWindow(hwnd, TRUE);
+            SetForegroundWindow(hwnd);
+            return true;
+        }
+        return false;
+    }
+    auto it = pData->idToHwnd.find(elementId);
+    if (it == pData->idToHwnd.end()) return false;
+    HWND ctrl = it->second;
+    if (strcmp(propertyName, "text") == 0) {
+        SetWindowTextA(ctrl, value);
+        return true;
+    }
+    // Add more property handling as needed
+    return false;
+}

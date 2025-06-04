@@ -1,6 +1,14 @@
 <?xml version="1.1" encoding="UTF-8"?>
 <Window dimension="400,360" title="Example 2" borderstyle="sizabletoolwindow" closeaction="closewindow">
-    <Background color="240,240,240" />
-    <RichText location="10,10" font="Consolas" fonttype="monospace" fontsize="9"><i>Hello</i>, <b>earth!</b> I'm a <del>test</del> for<br/><ins>font</ins> styling.</RichText>
-    <RichText location="10,50" font="Segoe UI" fontsize="9"><i>Hello</i>, <b>earth!</b> I'm a <del>test</del> for <ins>font</ins> styling.</RichText>
+    <Background id="bg" color="240,240,240" />
+    <RichText id="text1" location="10,10" font="Consolas" fonttype="monospace" fontsize="9">
+        <i>Hello</i>, <b>earth!</b> I'm a <del>test</del> for<br/><ins>font</ins> styling.
+    </RichText>
+    <RichText id="text2" location="10,heightof(text1)+10" font="Segoe UI" fontsize="9">
+        <i>Hello</i>, <b>earth!</b> I'm a <del>test</del> for <ins>font</ins> styling.
+    </RichText>
+    <Button id="button1" location="10,heightof(text1)+heightof(text2)+10" size="100,30" text="Click me" onclick="ChangeButtonText" font="Segoe UI" fontsize="9" />
+    <RichText id="text3" location="10+widthof(text1),10" fonttype="monospace" fontsize="9">
+        <b>Hello</b>, <i>earth!</i> I'm a <del>test</del> for <ins>font</ins> styling.
+    </RichText>
 </Window>

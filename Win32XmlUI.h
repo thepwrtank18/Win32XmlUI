@@ -15,4 +15,5 @@
 #endif
 
 WIN32XMLUI_API HWND CreateUIFromXML(const char* xmlPath, HINSTANCE hInstance, int nCmdShow, int resourceId);
-WIN32XMLUI_API void RegisterCallback(const char* name, std::function<void()> func);
+WIN32XMLUI_API void RegisterCallback(const char* name, std::function<void(HWND)> func);
+WIN32XMLUI_API bool SetElementProperty(HWND hwnd, const char* elementId, const char* propertyName, const char* value);
