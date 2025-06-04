@@ -44,10 +44,12 @@ jobs:
           [Environment]::SetEnvironmentVariable('PATH', $env:PATH, [EnvironmentVariableTarget]::Machine)
 
       - name: Build Win32XmlUI
+        shell: cmd
         run: |
           .\build.bat
 
       - name: Build Sample
+        shell: cmd
         run: |
           cd sample
           .\build_sample.bat
