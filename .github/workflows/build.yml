@@ -13,6 +13,15 @@ jobs:
       - name: Checkout Source Tree
         uses: actions/checkout@v4.2.2
 
+      - name: Install Windows 10 SDK (10.0.22621.0)
+        run: |
+          $ErrorActionPreference = "Stop"
+          Invoke-WebRequest -Uri https://go.microsoft.com/fwlink/p/?linkid=2196248 -OutFile "$env:TEMP\winsdksetup.exe"
+          Start-Process -FilePath "$env:TEMP\winsdksetup.exe" -ArgumentList "/Quiet", "/NoRestart", "/Features", "+", "/InstallPath", "C:\WindowsSDK" -Wait
+          Write-Host Adding environment variables...
+          $env:PATH = 'C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64' + $env:PATH
+          [Environment]::SetEnvironmentVariable('PATH', $env:PATH, [EnvironmentVariableTarget]::Machine)
+
       - name: Setup TDM-GCC
         run: |
           Write-Host Downloading TDM-GCC v10.3.0...
