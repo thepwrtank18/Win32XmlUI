@@ -8,6 +8,9 @@ echo Please put an exclusion for the build folder.
 REM Add TDM-GCC to PATH
 set PATH=C:\TDM-GCC-64\bin;%PATH%
 
+REM Add Windows 11 SDK to PATH
+set PATH=C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64;%PATH%
+
 REM Build resource
 windres --target=pe-x86-64 .\resource.rc -O coff -o resource_x64.res
 windres --target=pe-i386 .\resource.rc -O coff -o resource_x86.res
